@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+    name: mongo
+spec:
+    serviceName: "mongo-headless-service" # ссылка на headless service
+    replicas: 2
+    selector:
+        matchLabels:
+            app: mongo
+    template:
+        metadata:
+            labels:
+                app: mongo
+        spec:
+          containers:
+          - name: mongo
+            image: mongo:8.2
+            ports:
+            - containerPort: 27017
+            env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              valueFrom:
+                  secretKeyRef:
+                      name: mongo-creds
+                      key: username
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                  secretKeyRef:
+                      name: mongo-creds
+                      key: password
+            livenessProbe:
+              exec:
+                  command:
+                  - mongosh
+                  - --eval
+                  - "db.adminCommand({ping:1})"
+              initialDelaySeconds: 30
+              periodSeconds: 10
+            readinessProbe:
+              exec:
+                  command:
+                  - mongosh
+                  - --eval
+                  - "db.adminCommand({ping:1})"
+              initialDelaySeconds: 30
+              periodSeconds: 5
+            volumeMounts:
+            - name: mongo-data
+              mountPath: /data/db
+            - name: mongo-cm-fill-db-script
+              mountPath: /docker-entrypoint-initdb.d/fill-db-script.sh # MongoDB автоматически выполнит все .js и .sh файлы
+              subPath: fill-db-script.sh
+            - name: mongo-cm-init-replicaset
+              mountPath: /docker-entrypoint-initdb.d/init-replicaset.sh
+              subPath: init-replicaset.sh  # Важно!
+          volumes:
+          - name: mongo-data
+            persistentVolumeClaim:
+              claimName: mongo-pvc
+          - name: mongo-cm-fill-db-script
+            configMap:
+              name: mongo-cm-fill-db-script
+              defaultMode: 0755  # Добавить права на выполнение
+          - name: mongo-cm-init-replicaset
+            configMap:
+              name: mongo-cm-init-replicaset
+              defaultMode: 0755  # Добавить права на выполнение

@@ -1,0 +1,92 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongo-cm-fill-db-script
+data:
+  fill-db-script.sh: |
+    #!/bin/bash
+    set -x
+    
+    POD_NAME=${HOSTNAME}
+    if [[ $POD_NAME != "mongo-0" ]]; then
+      echo "Это не первый под ($POD_NAME), пропуск заполнения тестовыми данными"
+      exit 0
+    fi
+
+    echo "Ожидание запуска MongoDB..."
+    
+    until mongosh --host localhost \
+      --username $MONGO_INITDB_ROOT_USERNAME \
+      --password $MONGO_INITDB_ROOT_PASSWORD \
+      --authenticationDatabase admin \
+      --eval 'db.runCommand({ping:1})'; do
+      echo "MongoDB ещё не готова, ждём 2 секунды..."
+      sleep 2
+    done
+    
+    echo "MongoDB доступна. Создаём коллекцию и добавляем данные..."
+    
+    mongosh --host localhost \
+      --username $MONGO_INITDB_ROOT_USERNAME \
+      --password $MONGO_INITDB_ROOT_PASSWORD \
+      --authenticationDatabase admin \
+      testdb --quiet  <<EOF
+    use testdb;
+    db.createCollection("users");
+    db.users.insertMany([
+      { name: "Иван Иванов", email: "ivan@example.com", createdAt: new Date() },
+      { name: "Мария Петрова", email: "maria@example.com", createdAt: new Date() },
+      { name: "Алексей Сидоров", email: "alex@example.com", createdAt: new Date() }
+    ]);
+    EOF
+    
+    echo "Инициализация завершена."
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongo-cm-init-replicaset
+data:
+  init-replicaset.sh: |
+    #!/bin/bash
+    set -x
+
+    POD_NAME=${HOSTNAME}
+    if [[ $POD_NAME != "mongo-0" ]]; then
+      echo "Это не первый под ($POD_NAME), пропуск инициализации replica set"
+      exit 0
+    fi
+    
+    echo "Начало инициализации ReplicaSet на поде $POD_NAME"
+    
+    until mongosh --host localhost \
+      --username $MONGO_INITDB_ROOT_USERNAME \
+      --password $MONGO_INITDB_ROOT_PASSWORD \
+      --authenticationDatabase admin \
+      --eval "db.adminCommand({ping:1})" > /dev/null 2>&1; do
+      echo "Waiting for MongoDB..."
+      sleep 2
+    done
+    
+    STATUS=$(mongosh --host localhost \
+      --username $MONGO_INITDB_ROOT_USERNAME \
+      --password $MONGO_INITDB_ROOT_PASSWORD \
+      --authenticationDatabase admin \
+      --quiet --eval "try { rs.status().ok } catch(e) { 0 }")
+    
+    if [[ $STATUS == "1" ]]; then
+      echo "ReplicaSet уже проинициализирован"
+      exit 0
+    fi
+    
+    mongosh --host localhost \
+      --username $MONGO_INITDB_ROOT_USERNAME \
+      --password $MONGO_INITDB_ROOT_PASSWORD \
+      --authenticationDatabase admin \
+      --eval '
+      rs.initiate({
+        _id: "rs0",
+        members: [{ _id: 0, host: "mongo-0.mongo-headless-service:27017" }]
+      })
+    '
