@@ -2,6 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: mongo-cm-fill-db-script
+  namespace: databases
 data:
   fill-db-script.sh: |
     #!/bin/bash
@@ -47,6 +48,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: mongo-cm-init-replicaset
+  namespace: databases
 data:
   init-replicaset.sh: |
     #!/bin/bash

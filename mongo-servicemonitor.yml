@@ -1,0 +1,19 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mongo-monitor
+  namespace: monitoring  # ServiceMonitor обычно лежит в том же неймспейсе, что и Prometheus
+  labels:
+    release: prometheus-stack # ЭТОТ ЛЕЙБЛ КРИТИЧЕН!
+    # Prometheus из kube-prometheus-stack по умолчанию ищет ServiceMonitor'ы с лейблом 'release: prometheus-stack'
+spec:
+  selector:
+    matchLabels:
+      app: mongo # Лейбл, который есть на нашем Service 'mongodb-stats-svc'
+  namespaceSelector:
+    matchNames:
+      - databases  # Неймспейс, где находится ваш MongoDB и сервис
+  endpoints:
+    - port: metrics   # Имя порта из Service
+      interval: 30s
+      path: /metrics

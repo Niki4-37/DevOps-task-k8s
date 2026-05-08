@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
     name: mongo
+    namespace: databases
 spec:
     serviceName: "mongo-headless-service" # ссылка на headless service
     replicas: 2
@@ -12,6 +13,10 @@ spec:
         metadata:
             labels:
                 app: mongo
+            annotations:
+              prometheus.io/scrape: "true"
+              prometheus.io/port: "9216"
+              prometheus.io/path: "/metrics"
         spec:
           containers:
           - name: mongo
@@ -54,10 +59,38 @@ spec:
             - name: mongo-cm-init-replicaset
               mountPath: /docker-entrypoint-initdb.d/init-replicaset.sh
               subPath: init-replicaset.sh  # Важно!
+          
+          - name: mongo-exporter
+            image: percona/mongodb_exporter:0.50
+            ports:
+              - containerPort: 9216
+                name: metrics
+            env:
+              - name: MONGODB_URI
+                value: "mongodb://$(MONGO_INITDB_ROOT_USERNAME):$(MONGO_INITDB_ROOT_PASSWORD)@127.0.0.1:27017"
+            envFrom:
+              - secretRef:
+                  name: mongo-creds
+            args: ["--collect-all", "--compatible-mode"]          
+            livenessProbe:
+              tcpSocket:
+                port: 27017
+              initialDelaySeconds: 60
+              periodSeconds: 10
+            readinessProbe:
+              tcpSocket:
+                port: 27017
+              initialDelaySeconds: 40
+              periodSeconds: 5
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "200m"
+              limits:
+                memory: "512Mi"
+                cpu: "400m"
+          
           volumes:
-          - name: mongo-data
-            persistentVolumeClaim:
-              claimName: mongo-pvc
           - name: mongo-cm-fill-db-script
             configMap:
               name: mongo-cm-fill-db-script
@@ -66,3 +99,12 @@ spec:
             configMap:
               name: mongo-cm-init-replicaset
               defaultMode: 0755  # Добавить права на выполнение
+
+    volumeClaimTemplates:
+    - metadata:
+        name: mongo-data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 1Gi
