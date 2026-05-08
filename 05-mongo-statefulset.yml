@@ -65,21 +65,31 @@ spec:
             ports:
               - containerPort: 9216
                 name: metrics
-            env:
-              - name: MONGODB_URI
-                value: "mongodb://$(MONGO_INITDB_ROOT_USERNAME):$(MONGO_INITDB_ROOT_PASSWORD)@127.0.0.1:27017"
             envFrom:
               - secretRef:
                   name: mongo-creds
+            env:
+              - name: MONGO_INITDB_ROOT_USERNAME
+                valueFrom:
+                  secretKeyRef:
+                    name: mongo-creds
+                    key: username
+              - name: MONGO_INITDB_ROOT_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: mongo-creds
+                    key: password
+              - name: MONGODB_URI
+                value: "mongodb://$(MONGO_INITDB_ROOT_USERNAME):$(MONGO_INITDB_ROOT_PASSWORD)@127.0.0.1:27017"
             args: ["--collect-all", "--compatible-mode"]          
             livenessProbe:
               tcpSocket:
-                port: 27017
+                port: 9216
               initialDelaySeconds: 60
               periodSeconds: 10
             readinessProbe:
               tcpSocket:
-                port: 27017
+                port: 9216
               initialDelaySeconds: 40
               periodSeconds: 5
             resources:
