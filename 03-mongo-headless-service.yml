@@ -5,25 +5,18 @@ metadata:
   namespace: databases
   labels:
     app: mongo
+  annotations:
+    prometheus.io/scrape: "true"   # Разрешаем сбор метрик
+    prometheus.io/port: "9216"     # Порт экспортера (не путать с 27017!)
+    prometheus.io/path: "/metrics"
 spec:
-  clusterIP: None # определяет Headless
+  clusterIP: None
   selector:
     app: mongo
   ports:
-  - port: 27017
+  - name: mongodb
+    port: 27017
     targetPort: 27017
-
-apiVersion: v1
-kind: Service
-metadata:
-  name: mongodb-stats-service
-  namespace: databases
-  labels:
-    app: mongo
-spec:
-  selector:
-    app: mongo
-  ports:
-    - name: metrics
-      port: 9216
-      targetPort: metrics 
+  - name: metrics
+    port: 9216
+    targetPort: 9216
