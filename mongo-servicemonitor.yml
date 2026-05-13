@@ -4,7 +4,7 @@ metadata:
   name: mongo-monitor
   namespace: monitoring  # ServiceMonitor обычно лежит в том же неймспейсе, что и Prometheus
   labels:
-    release: prometheus-stack # ЭТОТ ЛЕЙБЛ КРИТИЧЕН!
+    release: prometheus # ЭТОТ ЛЕЙБЛ КРИТИЧЕН!
     # Prometheus из kube-prometheus-stack по умолчанию ищет ServiceMonitor'ы с лейблом 'release: prometheus-stack'
 spec:
   selector:
